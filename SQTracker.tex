@@ -1,0 +1,105 @@
+% June 6 21:00
+\documentclass[11pt]{article}
+\usepackage{amssymb,amsmath,epsfig,array}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage[breaklinks,colorlinks,urlcolor=blue,citecolor=blue,linkcolor=blue]{hyperref}
+\usepackage{lipsum}
+\usepackage{lineno}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{float}
+
+
+%
+
+%\include{commands}
+
+%\textwidth  = 6.5in
+%\textheight = 8.5in
+%\hoffset = 0.00in
+%\voffset = 0.00in
+
+\begin{document}
+
+\title{SpinQuest tracker algorithm}
+
+%\include{collaboration}
+\author{E.~Fuchey}
+%\affiliation{University of Connecticut{,} Storrs{,}  Connecticut 06269, USA}  
+
+\date{\today}
+
+\maketitle
+
+\linenumbers
+%
+\section{Summary}
+
+\subsection{Sources}
+\text{https://github.com/E1039-Collaboration/e1039-core/blob/master/packages/reco/ktracker/KalmanFastTracking.h}
+\text{https://github.com/E1039-Collaboration/e1039-core/blob/master/packages/reco/ktracker/KalmanFastTracking.cxx}
+\text{https://github.com/E1039-Collaboration/e1039-core/blob/master/packages/reco/interface/FastTracklet.cxx}
+\text{https://github.com/E1039-Collaboration/e1039-core/blob/master/packages/reco/interface/FastTracklet.h}
+
+\subsection{Main functions}
+
+\paragraph{buildTrackletsInStation(stationID, listID, pos, window)}
+Makes pairs of hits in xx', uu', vv', in selected station; if a view doesn't have hits, stop here.\\
+Combination of hits to form tracklets:
+\begin{itemize}
+\item{loop on x hits: combine x with u: to each x can only corresponds a range in u\_min$<$u\_pos$<$u\_max;}
+\item{inside loop x, loop on u hits: reject all u hits which do not meet u\_min$<$u\_pos$<$u\_max: for those who do, calculate v\_window, v\_min, v\_max;}
+\item{inside loop u, loop on v hits: reject all v hits which do not meet v\_min$<$v\_pos$<$v\_max: for those who do, add a tracklet with the combination of hits, and fit it;}
+\item{if tracklet is "valid" (see below) it is kept, otherwise it isn't;}
+\end{itemize}
+Once the combinations have been made, tracklets are added intot the tracklet list
+
+\paragraph{buildBackPartialTracks()}
+Combination of tracklets from station 2 and 3 to form backtracks.
+\begin{itemize}
+\item{loop on station 3 tracklets; if not coarse mode, loop on the tracklet 3 hits to extract only the X hits;}
+\item{inside loop 3, loop on station 2 tracklets; if not coarse mode, loop on the tracklet 2 hits to extract only the X hits;}
+\item{fit the backtrack in X; then check the proportional tubes: we want at least one hit there;}
+\item{otherwise, add the two tracklets together to obtain tracklet 23 (aka backtrack), and fit it. If the fit $\chi^2$ is too high, reject tracklet; if not coarse mode, resolve left right for backtrack.}
+\item{Then keep only the best backtrack (i.e. with best $\chi^2$ or best proba).}
+\end{itemize}
+
+
+\paragraph{buildGlobalTracks()}
+Combinations of backtracks and hits in station 1 to form global tracks:
+\begin{itemize}
+\item{Loop on backtracks: evaluation of windows with Sagitta method if KMag ON, with extrapolation otherwise; then build tracklets in station 1 (using the windows obtained with the search window method);}
+\item{inside loop on backtracks, loop on station plane (2 stations);}
+\item{inside loop on station plane, loop on station  hits; multiply (?) tracklet 1 and backtrack, and fit; reject if no hodo hits; if not coarse mode, resolve left right for backtrack, then remove bad hits (on what criteria?); then keep the global track with the best fit; If Kalmann filter, reconstruct vertex, keep the track with the best vertex $\chi^2$;}
+\item{after the loop on station1 hits, keep the very best track: The selection logic is, prefer the tracks with best p-value, as long as it's not low-pz; otherwise select the one with best vertex $\chi^2$; then fall back to the default only choice.}
+\item{After the loop on backtracks, if best track from each station have momentum less than a defined value of ?, merge tracks; if the merged track is is better than the separate ones, keep it, otherwise, keep the best one of the two (better = with best $\chi^2$ or best proba).}
+\end{itemize}
+
+\subsection{Other useful functions}
+
+\paragraph{"valid" tracklet:}
+        in station 1 to "nStations" (nstations being the number of stations involved in the tracklet); 
+        slope, interesection within the limits assigned for the station; 
+        error for these parameters positive;
+        probability has to be better that "loose" probability defined for the station if the station is the last one
+        if station ID $<$ nStations-1 (?) the tracklet has to have at least one hit in each station, and 4 hits total, $\chi^2$ has to be lower than 40
+        for station 2,3  the tracklet has to have at least one good hit in each station, and 4good  hits total;
+        for a full track, station 1 tracklet has to have at least one good hit in each station, 4good hits total, and the track prob has to be better than defined "tight" proba+ inverse momentum has to be between defined limits;
+    tracklet prob: prob ($\chi^2$, ndf) with ndf = number of hits -5 for full tracks, number of hits-4 for partial tracks 
+\paragraph{"hodomask" for tracklets:}
+Returns true if hodoscope hits can be found on the path of the track;
+loops on stations, then on hits: evaluate the track position on the hodoscope plane, then check that hodoscope hits correspond to that position (within some errors).
+\paragraph{ResolveLeftRight:}
+4 possibilities: ++, +-, -+, --;
+Loop on pair of consecutive hits; then loop on all 4 possibilities:  calculate local intersection and slope for each hit, considering each possibility; compare it with the global slope and interesection with the "pull" (the square root of the sum of delta slope squared /err\_slope square and delta inter squared / err inter); 
+when the "pull" is below the user defined threshold, the hit sign of each hit is affected with the possibility being considered.
+
+\newpage
+        
+%\include{eventreducer}
+%\include{trackletbuilder}
+%\include{backtrackbuilder}
+%\include{}
+%\include{eventreducer}
+
+\end{document}
